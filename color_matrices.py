@@ -28,3 +28,5 @@ alpha = 2
 Matd2xyz = Matd2xyz_jh
 Matd2xyz[:,0] = alpha*Matd2xyz_jh[:,0]
 Mxyz2atd = np.linalg.inv(Matd2xyz)
+
+gamma = np.array([1/2.2, 1/2.2, 1/2.1])
