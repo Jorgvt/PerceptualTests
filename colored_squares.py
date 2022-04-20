@@ -45,6 +45,12 @@ def create_colored_square(img_size,
         Color of the square.
     bg_color: list[int]
         Color of the background.
+
+    Returns
+    -------
+    image: array
+        Image of size img_size with a center square of size square_size
+        with (potentially) different background and square colors.
     """
     
     image = np.ones(shape=img_size)
