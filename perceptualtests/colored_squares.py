@@ -24,7 +24,7 @@ def create_square_mask(img_size, square_size):
                   (x <(img_size[0]//2 + square_size[0]//2)) &\
                   (y>=(img_size[1]//2 - square_size[1]//2)) &\
                   (y <(img_size[1]//2 + square_size[1]//2))
-    return square_mask
+    return square_mask.T
 
 def create_colored_square(img_size,
                           square_size,
