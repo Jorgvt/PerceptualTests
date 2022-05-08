@@ -49,7 +49,7 @@ def obtain_receptive_field(model, img_height, img_width, channels, fov=32, chann
 
     return receptive_field
 
-def obtain_receptive_field_gen(img_height, img_width, channels, fov=32):
+def obtain_receptive_field_gen(img_height, img_width, channels, fov=32, bg_gain=0.5, delta_gain=0.05):
     """
     This generator yields the deltas needed to calculate the receptive
     field of a model.
@@ -64,6 +64,10 @@ def obtain_receptive_field_gen(img_height, img_width, channels, fov=32):
         Number of channels of the images that the model accepts.
     fov:
         Field Of View as explained before.
+    bg_gain:
+        Intensity of the background.
+    delta_gain:
+        Value of the added delta.
     
     Returns
     -------
@@ -74,7 +78,34 @@ def obtain_receptive_field_gen(img_height, img_width, channels, fov=32):
     for i in range(img_height//2-fov, img_height//2+fov):
         for j in range(img_width//2-fov, img_width//2+fov):
             for k in range(channels):
-                zero = np.zeros((img_height, img_width, channels))
-                zero[i,j,k] = 1
+                zero = np.zeros((img_height, img_width, channels)) + bg_gain
+                zero[i,j,k] += delta_gain
 
                 yield zero
+
+def normalization_fixed_0(responses, expo=0.5):
+    """
+    Normalization that tries to keep the 0 fixed as well as raising the lower values
+    so that they are closer to the higher values.
+
+    Parameters
+    ----------
+    responses: np.array
+        Array of responses in any shape.
+    expo: float
+        How much we want to raise the lower values.
+        A lower number implies more raising but can saturate the higher values.
+        A value of 1 doesn't affect the values.
+    
+    Returns
+    -------
+    respo_abs_norm_e_signo_vis: np.array
+        Array of normalized response with the same shape as the input.
+    """
+    signo = np.sign(responses)
+    respo_abs = np.abs(responses)
+    respo_abs_norm = (respo_abs - respo_abs.min()) / (respo_abs.max() - respo_abs.min())
+    respo_abs_norm_e = respo_abs_norm ** expo
+    respo_abs_norm_e_signo = signo * respo_abs_norm_e
+    respo_abs_norm_e_signo_vis = respo_abs_norm_e_signo/2 + 0.5
+    return respo_abs_norm_e_signo_vis
