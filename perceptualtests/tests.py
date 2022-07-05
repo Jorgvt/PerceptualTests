@@ -100,6 +100,7 @@ class CrispeningAchromaticTest(PsychoTest):
                 alpha = 1 - (i/(len(readouts)-1))
             plt.plot(np.cumsum(dist), readout, 'o-', color=color, alpha=alpha, label=f'{atd_bg[i]} $cd/m^2$')
         plt.xlabel(r'$|\mathrm{\vec{n}}|$ (Digital Values)')
+        plt.ylabel('Visibility')
         plt.legend(title = 'Background luminance')
 
     def test(self, model):
@@ -176,6 +177,7 @@ class CrispeningRedGreenTest(PsychoTest):
                      color=color[i], alpha=alpha[i], 
                      label=' ')
         plt.xlabel(r'$|\mathrm{\vec{n}}|$ (Digital Values)')
+        plt.ylabel('Visibility')
         plt.legend(title = 'Background color')
 
     def test(self, model):
@@ -252,6 +254,7 @@ class CrispeningYellowBlueTest(PsychoTest):
                      color=color[i], alpha=alpha[i], 
                      label=' ')
         plt.xlabel(r'$|\mathrm{\vec{n}}|$ (Digital Values)')
+        plt.ylabel('Visibility')
         plt.legend(title = 'Background color')
 
     def test(self, model):
