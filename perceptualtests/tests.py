@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from .color_matrices import *
 from .colored_squares import create_colored_square
 
-__all__ = ['PsychoTest', 'CrispeningAchromaticTest']
+__all__ = ['PsychoTest', 'CrispeningAchromaticTest', 'CrispeningRedGreenTest', 'CrispeningYellowBlueTest']
 
 class PsychoTest(abc.ABC):
     
