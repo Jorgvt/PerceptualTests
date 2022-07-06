@@ -5,8 +5,12 @@ import matplotlib.pyplot as plt
 
 from .color_matrices import *
 from .colored_squares import create_colored_square
+from .stimuli import *
 
-__all__ = ['PsychoTest', 'CrispeningAchromaticTest', 'CrispeningRedGreenTest', 'CrispeningYellowBlueTest']
+__all__ = ['PsychoTest', 
+           'CrispeningAchromaticTest', 
+           'CrispeningRedGreenTest', 
+           'CrispeningYellowBlueTest']
 
 class PsychoTest(abc.ABC):
     
@@ -14,14 +18,17 @@ class PsychoTest(abc.ABC):
     def test(self, model):
         ...
     
-    @abc.abstractmethod
-    def show_stimuli(self):
-        ...
-
     @property
     @abc.abstractmethod
     def stimuli(self):
         ...
+    
+    def show_stimuli(self, **kwargs):
+        fig, axis = plt.subplots(*self.stimuli.shape[:2], **kwargs)
+        for i,ax_bg in enumerate(axis):
+            for j, ax_t in enumerate(ax_bg):
+                ax_t.imshow(self.stimuli[i,j])
+                ax_t.axis('off')
 
 def atd2rgb(atd):
     """
@@ -64,13 +71,6 @@ class CrispeningAchromaticTest(PsychoTest):
                     colored_squares[i] = colored_square
                 self._stimuli[idx_bg] = colored_squares
         return self._stimuli
-
-    def show_stimuli(self, **kwargs):
-        fig, axis = plt.subplots(*self.stimuli.shape[:2], **kwargs)
-        for i,ax_bg in enumerate(axis):
-            for j, ax_t in enumerate(ax_bg):
-                ax_t.imshow(self.stimuli[i,j])
-                ax_t.axis('off')
 
     def get_readouts(self, model):
         all_readouts = np.empty(shape=self.stimuli.shape[:2])
@@ -142,13 +142,6 @@ class CrispeningRedGreenTest(PsychoTest):
                 self._stimuli[idx_bg] = colored_squares
         return self._stimuli
 
-    def show_stimuli(self, **kwargs):
-        fig, axis = plt.subplots(*self.stimuli.shape[:2], **kwargs)
-        for i,ax_bg in enumerate(axis):
-            for j, ax_t in enumerate(ax_bg):
-                ax_t.imshow(self.stimuli[i,j])
-                ax_t.axis('off')
-
     def get_readouts(self, model):
         bg_idx = np.array([6, 8, 11, 14, 16])-1
         all_readouts = np.empty(shape=self.stimuli.shape[:2])
@@ -218,13 +211,6 @@ class CrispeningYellowBlueTest(PsychoTest):
                     colored_squares[i] = colored_square
                 self._stimuli[idx_bg] = colored_squares
         return self._stimuli
-
-    def show_stimuli(self, **kwargs):
-        fig, axis = plt.subplots(*self.stimuli.shape[:2], **kwargs)
-        for i,ax_bg in enumerate(axis):
-            for j, ax_t in enumerate(ax_bg):
-                ax_t.imshow(self.stimuli[i,j])
-                ax_t.axis('off')
 
     def get_readouts(self, model):
         bg_idx = np.array([6, 8, 11, 14, 16])-1
