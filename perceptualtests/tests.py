@@ -10,7 +10,11 @@ from .stimuli import *
 __all__ = ['PsychoTest', 
            'CrispeningAchromaticTest', 
            'CrispeningRedGreenTest', 
-           'CrispeningYellowBlueTest']
+           'CrispeningYellowBlueTest',
+           'MaskingContrastFrequencyTest',
+           'MaskingFixedFrequencyTest',
+           'MaskingFrequencyBackgroundTest',
+           'MaskingOrientationBackgroundTest']
 
 class PsychoTest(abc.ABC):
     
@@ -445,4 +449,247 @@ class MaskingFixedFrequencyTest(Masking):
             axis[test_freq_idx].legend(title = 'Background contrast')
             axis[test_freq_idx].set_title(f'Test frequency {self.f_tests[test_freq_idx]} cpd')
 
+class MaskingFrequencyBackgroundTest(Masking):
+    """
+    Test to check the behaviour when changing the contrast
+    of the test and the frequency of the background.
+    Its result is obtained by measuring the visibility of each image
+    with respect to only the background.
+    The difference with respect to `MaskingContrastFrequency` is that
+    here the background has a pattern that masks the test pattern.
+    """
+    def __init__(self, 
+                 f_tests=np.array([3, 12]), 
+                 f_backgrounds=np.array([0, 1.5, 3, 6, 12, 24]),
+                 c_tests=np.concatenate([[0],np.logspace(-3, np.log10(0.09), 15)]),
+                 c_backgrounds=np.array([0.25]),
+                 img_size=(256, 256), 
+                 L0=60, 
+                 fs=64,
+                 color=np.array([1, 0, 0])[None,:],
+                 angle=0,
+                 phase=0,
+                 gs=None,
+                 stimuli_type='gabor'):
+        self.f_tests = f_tests
+        self.f_backgrounds = f_backgrounds
+        self.c_tests = c_tests
+        self.c_backgrounds = c_backgrounds
+        self.fs = fs
+        self.img_size = img_size
+        self.num_rows, self.num_cols = img_size
+        self.L0 = L0
+        self._stimuli = None
+        self.color = color
+        self.angle = angle
+        self.phase = phase
+        self.gs = gs
+        self.stimuli_fn = create_gabors_gs if stimuli_type=='gabor' else create_noises
+
+    @property
+    def stimuli(self):
+        if self._stimuli is None:
+            gabors_atd, gabors = self.stimuli_fn(f_tests = self.f_tests,
+                                                 num_rows = self.num_rows, 
+                                                 num_cols = self.num_cols,
+                                                 num_frames = 1,
+                                                 fs = self.fs,
+                                                 L0 = self.L0,
+                                                 c_noises = self.c_tests,
+                                                 color_noise = self.color,
+                                                 angle = self.angle, #rad
+                                                 phase = self.phase,
+                                                 gs = self.gs)
+            gabors_atd_bg, gabors_bg = self.stimuli_fn(f_tests = self.f_backgrounds,
+                                                       num_rows = self.num_rows, 
+                                                       num_cols = self.num_cols,
+                                                       num_frames = 1,
+                                                       fs = self.fs,
+                                                       L0 = self.L0,
+                                                       c_noises = self.c_backgrounds,
+                                                       color_noise = self.color,
+                                                       angle = self.angle, #rad
+                                                       phase = self.phase,
+                                                       gs = None)
+            gabors_atd_sum = np.empty(shape=(len(self.f_tests),len(self.f_backgrounds),len(self.c_tests),*self.img_size,3))
+            for i in range(len(self.f_tests)): #test freq
+                for j in range(len(self.f_backgrounds)): #bg freq
+                    for k in range(len(self.c_tests)): #test contrast
+                        gabors_atd_sum[i,j,k] = gabors_atd[i,k] + gabors_atd_bg[j]
+                        gabors_atd_sum[i,j,k] = gabors_atd_sum[i,j,k] - gabors_atd_sum[i,j,k].mean(axis=(0,1))/2
+            gabors_rgb_sum = (gabors_atd_sum @ Matd2xyz.T @ Mxyz2ng.T)**(1/2)
+            self._stimuli = gabors_rgb_sum
+        return self._stimuli
+
+    def show_stimuli(self, **kwargs):
+        for test_freq_idx, stimuli_fixed_freq in enumerate(self.stimuli):
+            fig, axis = plt.subplots(*stimuli_fixed_freq.shape[:2], **kwargs)
+            for i,ax_bg in enumerate(axis):
+                for j, ax_t in enumerate(ax_bg):
+                    ax_t.imshow(stimuli_fixed_freq[i,j])
+                    ax_t.axis('off')
+            plt.suptitle(f'Test frequency {self.f_tests[test_freq_idx]} cpd')
+        
+    def get_readouts(self, model):
+        all_readouts = np.empty(shape=self.stimuli.shape[:3])
+        for i, imgs_same_f in enumerate(self.stimuli):
+            for j, imgs_same_bg in enumerate(imgs_same_f):
+                outputs = model.predict(imgs_same_bg)
+                readouts = (outputs-outputs[0])**2
+                readouts = np.sqrt(np.sum(readouts, axis=(1,2,3)))
+                all_readouts[i,j] = readouts
+        return all_readouts
     
+    def plot_result(self, readouts):
+        fig, axis = plt.subplots(1, len(self.f_tests), sharey = True)
+        for test_freq_idx, stimuli_fixed_freq in enumerate(readouts): 
+            for i, readout in enumerate(stimuli_fixed_freq):
+                if i == np.where(self.f_backgrounds==self.f_backgrounds.min())[0].item():
+                    color = [0,0,1]
+                    alpha = 1
+                elif i == np.where(self.f_backgrounds==self.f_tests[test_freq_idx])[0].item():
+                    color = [1,0,0]
+                    alpha = 1
+                else:
+                    color = 'black'
+                    alpha = 1 - (i/(len(stimuli_fixed_freq)-1))*0.8
+                axis[test_freq_idx].plot(self.c_tests, readout, 
+                                         '-', color=color, alpha=alpha, 
+                                         label=f'{self.f_backgrounds[i]}')
+            axis[test_freq_idx].set_xlabel('Test Contrast')
+            axis[test_freq_idx].set_ylabel('Visibility')
+            axis[test_freq_idx].legend(title = 'Background frequency')
+            axis[test_freq_idx].set_title(f'Test frequency {self.f_tests[test_freq_idx]} cpd')
+
+class MaskingOrientationBackgroundTest(Masking):
+    """
+    Test to check the behaviour when changing the contrast
+    of the test and the orientation of the background.
+    Its result is obtained by measuring the visibility of each image
+    with respect to only the background.
+    The difference with respect to `MaskingContrastFrequency` is that
+    here the background has a pattern that masks the test pattern.
+    """
+    def __init__(self, 
+                 f_tests=np.array([3, 12]), 
+                 f_backgrounds=np.array([3, 12]),
+                 c_tests=np.concatenate([[0],np.logspace(-3, np.log10(0.09), 15)]),
+                 c_backgrounds=np.array([0.25]),
+                 img_size=(256, 256), 
+                 L0=60, 
+                 fs=64,
+                 color=np.array([1, 0, 0])[None,:],
+                 angle=0,
+                 angle_backgrounds=np.linspace(0, 180, 8),
+                 phase=0,
+                 gs=None,
+                 stimuli_type='gabor'):
+        self.f_tests = f_tests
+        self.f_backgrounds = f_backgrounds
+        self.c_tests = c_tests
+        self.c_backgrounds = c_backgrounds
+        self.fs = fs
+        self.img_size = img_size
+        self.num_rows, self.num_cols = img_size
+        self.L0 = L0
+        self._stimuli = None
+        self.color = color
+        self.angle = angle
+        self.angle_backgrounds = angle_backgrounds
+        self.phase = phase
+        self.gs = gs
+        self.stimuli_fn = create_gabors_gs if stimuli_type=='gabor' else create_noises
+
+    @property
+    def stimuli(self):
+        if self._stimuli is None:
+            gabors_atd, gabors = self.stimuli_fn(f_tests = self.f_tests,
+                                                 num_rows = self.num_rows, 
+                                                 num_cols = self.num_cols,
+                                                 num_frames = 1,
+                                                 fs = self.fs,
+                                                 L0 = self.L0,
+                                                 c_noises = self.c_tests,
+                                                 color_noise = self.color,
+                                                 angle = self.angle, #rad
+                                                 phase = self.phase,
+                                                 gs = self.gs)
+
+            gabors_atd_bg = np.empty(shape=(len(self.f_backgrounds), len(self.angle_backgrounds), self.num_rows, self.num_cols, 3))
+            gabors_bg = np.empty(shape=(len(self.f_backgrounds), len(self.angle_backgrounds), self.num_rows, self.num_cols, 3))
+            for i in range(len(self.angle_backgrounds)):
+                gabor_atd_bg, gabor_bg = create_gabors_gs(f_tests = self.f_backgrounds,
+                                                          num_rows = self.num_rows, 
+                                                          num_cols = self.num_cols,
+                                                          num_frames = 1,
+                                                          fs = self.fs,
+                                                          L0 = self.L0,
+                                                          c_noises = self.c_backgrounds,
+                                                          color_noise = np.array([1, 0, 0])[None,:],
+                                                          angle = self.angle_backgrounds[i]*np.pi/180, #rad
+                                                          phase = np.random.uniform(0, 2*np.pi),
+                                                          gs = None)
+                gabors_atd_bg[:,i,:,:,:] = gabor_atd_bg
+                gabors_bg[:,i,:,:,:] = gabor_bg
+
+            gabors_atd_sum = np.empty(shape=(len(self.f_tests),len(self.angle_backgrounds),len(self.c_tests),*self.img_size,3))
+            for i in range(len(self.f_tests)): #test freq
+                for j in range(len(self.angle_backgrounds)): #bg angle
+                    for k in range(len(self.c_tests)): #test contrast
+                        gabors_atd_sum[i,j,k] = gabors_atd[i,k] + gabors_atd_bg[i,j]
+                        gabors_atd_sum[i,j,k] = gabors_atd_sum[i,j,k] - gabors_atd_sum[i,j,k].mean(axis=(0,1))/2
+            gabors_rgb_sum = (gabors_atd_sum @ Matd2xyz.T @ Mxyz2ng.T)**(1/2)
+
+            gabors_atd_sum_0 = np.empty(shape=(len(self.f_tests),1,len(self.c_tests),*self.img_size,3))
+            for i in range(len(self.f_tests)): #test freqs
+                for j in range(1): #bg angle
+                    for k in range(len(self.c_tests)): #test contrast
+                        gabors_atd_sum_0[i,j,k] = gabors_atd[i,k]
+                        gabors_atd_sum_0[i,j,k] = gabors_atd_sum_0[i,j,k] 
+            gabors_rgb_sum_0 = (gabors_atd_sum_0 @ Matd2xyz.T @ Mxyz2ng.T)**(1/2)
+            gabors_rgb_sum = np.concatenate([gabors_rgb_sum_0, gabors_rgb_sum], axis=1)
+            self._stimuli = gabors_rgb_sum
+        return self._stimuli
+
+    def show_stimuli(self, **kwargs):
+        for test_freq_idx, stimuli_fixed_freq in enumerate(self.stimuli):
+            fig, axis = plt.subplots(*stimuli_fixed_freq.shape[:2], **kwargs)
+            for i,ax_bg in enumerate(axis):
+                for j, ax_t in enumerate(ax_bg):
+                    ax_t.imshow(stimuli_fixed_freq[i,j])
+                    ax_t.axis('off')
+            plt.suptitle(f'Test frequency {self.f_tests[test_freq_idx]} cpd')
+        
+    def get_readouts(self, model):
+        all_readouts = np.empty(shape=self.stimuli.shape[:3])
+        for i, imgs_same_f in enumerate(self.stimuli):
+            for j, imgs_same_bg in enumerate(imgs_same_f):
+                outputs = model.predict(imgs_same_bg)
+                readouts = (outputs-outputs[0])**2
+                readouts = np.sqrt(np.sum(readouts, axis=(1,2,3)))
+                all_readouts[i,j] = readouts
+        return all_readouts
+    
+    def plot_result(self, readouts):
+        fig, axis = plt.subplots(1, len(self.f_tests), sharey = True)
+        for test_freq_idx, stimuli_fixed_freq in enumerate(readouts): 
+            for i, readout in enumerate(stimuli_fixed_freq,-1):
+                if i == -1:
+                    color = [0,0,1]
+                    alpha = 1
+                    label = 'No background'
+                elif i == np.where(self.angle_backgrounds==self.angle)[0].item():
+                    color = [1,0,0]
+                    alpha = 1
+                    label=f'{self.angle_backgrounds[i]:.0f} deg'
+                else:
+                    color = 'black'
+                    alpha = 1 - (i/(len(stimuli_fixed_freq)-1))*0.8
+                    label=f'{self.angle_backgrounds[i]:.0f} deg'
+                axis[test_freq_idx].plot(self.c_tests, readout, 
+                                         '-', color=color, alpha=alpha, 
+                                         label=label)
+            axis[test_freq_idx].set_xlabel('Test Contrast')
+            axis[test_freq_idx].set_ylabel('Visibility')
+            axis[test_freq_idx].legend(title = 'Background angle')
+            axis[test_freq_idx].set_title(f'Test frequency {self.f_tests[test_freq_idx]} cpd')
