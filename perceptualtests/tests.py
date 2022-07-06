@@ -246,3 +246,89 @@ class CrispeningYellowBlueTest(PsychoTest):
     def test(self, model):
         readouts = self.get_readouts(model)
         self.plot_result(readouts)
+
+class Masking(PsychoTest):
+    """
+    Class dedicated to building masking tests.
+    All of these tests are based on having a test signal
+    over a background and calculating the visibility with
+    respect to this background.
+    """
+    def get_readouts(self, model):
+        all_readouts = np.empty(shape=self.stimuli.shape[:2])
+        for i, imgs_samebg in enumerate(self.stimuli):
+            outputs = model.predict(imgs_samebg)
+            readouts = (outputs-outputs[0])**2
+            readouts = np.sqrt(np.sum(readouts, axis=(1,2,3)))
+            all_readouts[i] = readouts
+        return all_readouts
+
+    def test(self, model):
+        readouts = self.get_readouts(model)
+        self.plot_result(readouts)
+
+class MaskingContrastFrequencyTest(Masking):
+    """
+    Test to check the behavior when changing the contrast
+    of the test at different frequencies.
+    Its result is obtained by measuring the visibility of each image
+    with respect to only the background.
+    """
+    def __init__(self, 
+                 f_tests=np.array([1.5, 3, 6, 12, 24]), 
+                 c_tests=np.concatenate([[0],np.logspace(-3, np.log10(0.09), 15)]),
+                 img_size=(256, 256), 
+                 L0=60, 
+                 fs=64,
+                 color=np.array([1, 0, 0])[None,:],
+                 angle=0,
+                 phase=0,
+                 gs=None,
+                 stimuli_type='gabor'):
+        self.f_tests = f_tests
+        self.c_tests = c_tests
+        self.fs = fs
+        self.img_size = img_size
+        self.num_rows, self.num_cols = img_size
+        self.L0 = L0
+        self._stimuli = None
+        self.color = color
+        self.angle = angle
+        self.phase = phase
+        self.gs = gs
+        self.stimuli_fn = create_gabors_gs if stimuli_type=='gabor' else create_noises
+
+    @property
+    def stimuli(self):
+        if self._stimuli is None:
+            gabors_atd, gabors = self.stimuli_fn(f_tests = self.f_tests,
+                                                 num_rows = self.num_rows, 
+                                                 num_cols = self.num_cols,
+                                                 num_frames = 1,
+                                                 fs = self.fs,
+                                                 L0 = self.L0,
+                                                 c_noises = self.c_tests,
+                                                 color_noise = self.color,
+                                                 angle = self.angle, #rad
+                                                 phase = self.phase,
+                                                 gs = self.gs)
+            self._stimuli = gabors
+        return self._stimuli
+
+    def plot_result(self, readouts):
+        for i, readout in enumerate(readouts):
+            if i == 1:
+                color = [0,0,1]
+                alpha = 1
+            elif i == len(readouts)-1:
+                color = [1,0,0]
+                alpha = 1
+            else:
+                color = 'black'
+                alpha = 1 - (i/(len(readouts)-1))
+            plt.plot(self.c_tests, readout, 
+                     '-', color=color, alpha=alpha, 
+                     label=f'{self.f_tests[i]} cdp')
+        plt.xlabel('Test Contrast')
+        plt.ylabel('Visibility')
+        plt.legend(title = 'Test frequency')
