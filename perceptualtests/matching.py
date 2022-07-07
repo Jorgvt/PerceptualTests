@@ -1,4 +1,6 @@
 from abc import abstractmethod
+from tqdm.auto import tqdm
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -162,9 +164,10 @@ class ColorMatchingInstance():
 
         return img_lambda, img_white#, rgb_2_l, rgb_2_w
 
-    def fit(self, model, epochs, verbose=True):
+    def fit(self, model, epochs, verbose=True, use_tqdm=True):
         history = {'Loss':[], 'GradsL2':[]}
-        for epoch in range(epochs):
+        pbar = tqdm(range(epochs)) if use_tqdm else range(epochs)
+        for epoch in pbar:
             with tf.GradientTape() as tape:
                 img_l, img_w = self.generate_images()
                 imgs = tf.concat([img_l, img_w], axis=0)
@@ -176,6 +179,6 @@ class ColorMatchingInstance():
             self.optimizer.apply_gradients(zip([grads], [self.weights]))
             history['Loss'].append(loss.numpy().item())
             history['GradsL2'].append(tf.reduce_sum(grads**2).numpy().item())
-            if verbose:
+            if verbose and not use_tqdm:
                 print(f'Epoch {epoch+1} -> Loss: {history["Loss"][-1]} | GradsL2: {history["GradsL2"][-1]}')
         return history
