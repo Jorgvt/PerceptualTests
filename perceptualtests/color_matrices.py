@@ -1,4 +1,14 @@
 import numpy as np
+import scipy.io as sio
+
+__all__ = ['Mxyz2atd',
+           'Matd2xyz',
+           'Mng2xyz',
+           'Mxyz2ng',
+           'Mlms2xyz',
+           'Mxyz2lms',
+           'gamma',
+           'T_lambda']
 
 Mng2xyz = np.array([[69.1661, 52.4902, 46.6052],
                     [39.0454, 115.8404, 16.3118],
@@ -30,3 +40,5 @@ Matd2xyz = Matd2xyz_jh
 Mxyz2atd = np.linalg.inv(Matd2xyz)
 
 gamma = np.array([1/2.2, 1/2.2, 1/2.1])
+
+T_lambda = sio.loadmat("./data/cmf_ciexyz")['T_lambda'].astype(np.float32)
