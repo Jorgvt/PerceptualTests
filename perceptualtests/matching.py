@@ -67,31 +67,6 @@ def xyz2nrgb_tf(xyz, gamma, clip=False):
     
     return rgb
 
-class ColorMatching():
-    """
-    Color matching experiment where different monochromatic lights
-    are given and the user has to minimize the distance with respect
-    to a white image.
-    This process is performed in an iterative way by optimizing the
-    ammount of each color that is put into the images from a set
-    of four available wavelenghts.
-    """
-    
-    def __init__(self,
-                 wavelengths=np.linspace(380, 770, 50),
-                 central_wavelengths=[475.0, 500.0, 580.0, 700.0],
-                 max_radiance=1.5e-3,
-                 background_radiance=0.5e-4,
-                 norm_grads=False):
-        self.wavelengths = wavelengths
-        self.central_wavelengths = central_wavelengths
-        self.max_radiance = max_radiance
-        self.background_radiance = background_radiance
-        self.norm_grads = norm_grads
-
-    def fit(self, model, epochs):
-        pass
-
 class ColorMatchingInstance():
     """
     A color matching experiment instance, where instance means
@@ -166,7 +141,7 @@ class ColorMatchingInstance():
 
     def fit(self, model, epochs, verbose=True, use_tqdm=True):
         history = {'Loss':[], 'GradsL2':[]}
-        pbar = tqdm(range(epochs)) if use_tqdm else range(epochs)
+        pbar = tqdm(range(epochs), leave=False) if use_tqdm else range(epochs)
         for epoch in pbar:
             with tf.GradientTape() as tape:
                 img_l, img_w = self.generate_images()
@@ -182,3 +157,39 @@ class ColorMatchingInstance():
             if verbose and not use_tqdm:
                 print(f'Epoch {epoch+1} -> Loss: {history["Loss"][-1]} | GradsL2: {history["GradsL2"][-1]}')
         return history
+
+class ColorMatchingExperiment(ColorMatchingInstance):
+    """
+    Color matching experiment where different monochromatic lights
+    are given and the user has to minimize the distance with respect
+    to a white image.
+    This process is performed in an iterative way by optimizing the
+    ammount of each color that is put into the images from a set
+    of four available wavelenghts.
+    """
+    
+    def __init__(self,
+                 wavelengths=np.linspace(380, 770, 50),
+                 **kwargs):
+        # super(ColorMatchingExperiment, self).__init__(wavelength=None,
+        #                                               **kwargs)
+        self.wavelengths = wavelengths
+        self.instances = [ColorMatchingInstance(wavelength=wavelength, **kwargs) for wavelength in wavelengths]
+
+    def compile(self, loss, optimizer):
+        for instance in self.instances:
+            instance.loss = loss
+            instance.optimizer = optimizer
+
+    def fit(self, model, epochs, verbose=True, use_tqdm=True):
+        histories = []
+        pbar = tqdm(self.instances) if use_tqdm else self.instances
+        for instance in pbar:
+            if verbose and not use_tqdm:
+                print(f'Wavelength: {instance.wavelength}')
+            history = instance.fit(model,
+                                   epochs=epochs,
+                                   verbose=verbose,
+                                   use_tqdm=use_tqdm)
+            histories.append(history)
+        return histories
