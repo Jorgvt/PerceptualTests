@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.io as sio
+import os
 
 __all__ = ['Mxyz2atd',
            'Matd2xyz',
@@ -42,5 +43,7 @@ Mxyz2atd = np.linalg.inv(Matd2xyz)
 
 gamma = np.array([1/2.2, 1/2.2, 1/2.1])
 
-T_lambda = sio.loadmat("./data/cmf_ciexyz")['T_lambda'].astype(np.float32)
+path_T_lambda = os.path.dirname(__file__)
+path_T_lambda = os.path.join(path_T_lambda, 'data/cmf_ciexyz.mat')
+T_lambda = sio.loadmat(path_T_lambda)['T_lambda'].astype(np.float32)
 km = 683 #lumens/watt
