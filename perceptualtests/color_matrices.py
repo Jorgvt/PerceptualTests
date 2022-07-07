@@ -42,3 +42,4 @@ Mxyz2atd = np.linalg.inv(Matd2xyz)
 gamma = np.array([1/2.2, 1/2.2, 1/2.1])
 
 T_lambda = sio.loadmat("./data/cmf_ciexyz")['T_lambda'].astype(np.float32)
+km = 683 #lumens/watt
