@@ -8,7 +8,8 @@ __all__ = ['Mxyz2atd',
            'Mlms2xyz',
            'Mxyz2lms',
            'gamma',
-           'T_lambda']
+           'T_lambda',
+           'km']
 
 Mng2xyz = np.array([[69.1661, 52.4902, 46.6052],
                     [39.0454, 115.8404, 16.3118],
