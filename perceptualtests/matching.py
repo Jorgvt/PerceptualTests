@@ -97,6 +97,8 @@ class ColorMatchingInstance():
         self._Ts = None
         self.loss = None
         self.optimizer = None
+        self._history = None
+
     @property
     def Ts(self):
         if self._Ts is None:
@@ -139,8 +141,15 @@ class ColorMatchingInstance():
 
         return img_lambda, img_white#, rgb_2_l, rgb_2_w
 
+    @property
+    def history(self):
+        if self._history is None:
+            print('The experiment has not been fitted yet.')
+        return self._history
+
     def fit(self, model, epochs, verbose=True, use_tqdm=True):
-        history = {'Loss':[], 'GradsL2':[], 'Weights':[]}
+        if self._history is None:
+            self._history = {'Loss':[], 'GradsL2':[], 'Weights':[]}
         pbar = tqdm(range(epochs)) if use_tqdm else range(epochs)
         for epoch in pbar:
             with tf.GradientTape() as tape:
@@ -152,12 +161,12 @@ class ColorMatchingInstance():
             
             grads = tape.gradient(loss, self.weights)
             self.optimizer.apply_gradients(zip([grads], [self.weights]))
-            history['Loss'].append(loss.numpy().item())
-            history['GradsL2'].append(tf.reduce_sum(grads**2).numpy().item())
-            history['Weights'].append(self.weights.numpy())
+            self.history['Loss'].append(loss.numpy().item())
+            self.history['GradsL2'].append(tf.reduce_sum(grads**2).numpy().item())
+            self.history['Weights'].append(self.weights.numpy())
             if verbose and not use_tqdm:
-                print(f'Epoch {epoch+1} -> Loss: {history["Loss"][-1]} | GradsL2: {history["GradsL2"][-1]}')
-        return history
+                print(f'Epoch {epoch+1} -> Loss: {self.history["Loss"][-1]} | GradsL2: {self.history["GradsL2"][-1]}')
+        return self.history
 
 class ColorMatchingExperiment(ColorMatchingInstance):
     """
