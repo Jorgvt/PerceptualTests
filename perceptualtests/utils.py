@@ -80,15 +80,16 @@ def freqspace(N):
 
 
 def control_lum_contrast(image, L, C):
-  # CONTROL_LUM_CONTRAST sets the average luminance and RMSE sinus-like contrast for a natural image 
+    # CONTROL_LUM_CONTRAST sets the average luminance and RMSE sinus-like contrast for a natural image 
 
-  img_mean = np.mean(image)
-  img_std = np.std(image)*np.sqrt(2)
+    img_mean = np.mean(image)
+    img_std = np.std(image)*np.sqrt(2)
+    if img_std == 0:
+        img_std = 1
+    new_image = (image - img_mean)/img_std
+    new_image = L + C*L*new_image
 
-  new_image = (image - img_mean)/img_std
-  new_image = L + C*L*new_image
-
-  return new_image
+    return new_image
 
 def noise(fx2,fy2,fm,fM,angle,delta_a):
 

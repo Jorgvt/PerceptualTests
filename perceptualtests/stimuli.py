@@ -2,6 +2,9 @@ import numpy as np
 from .color_matrices import *
 from .utils import *
 
+__all__ = ['create_gabors_gs',
+           'create_noises']
+
 def create_gabors_gs(f_tests = np.array([1, 2, 4, 8, 16, 30]),
                      num_rows = 256, 
                      num_cols = 256,
@@ -59,6 +62,7 @@ def create_noises(f_tests = np.array([1, 2, 4, 8, 16, 30]),
                   color_noise = np.array([1, 0, 0])[None,:],
                   delta_angle = 180,
                   angle = 0,
+                  phase = 0,
                   gs = None,
                   **kwargs):
 
