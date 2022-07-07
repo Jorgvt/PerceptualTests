@@ -165,7 +165,8 @@ class ColorMatchingInstance():
             self.history['GradsL2'].append(tf.reduce_sum(grads**2).numpy().item())
             self.history['Weights'].append(self.weights.numpy())
             if verbose and not use_tqdm:
-                print(f'Epoch {epoch+1} -> Loss: {self.history["Loss"][-1]} | GradsL2: {self.history["GradsL2"][-1]}')
+                if epoch % verbose == 0:
+                    print(f'Epoch {epoch+1} -> Loss: {self.history["Loss"][-1]} | GradsL2: {self.history["GradsL2"][-1]}')
         return self.history
 
 class ColorMatchingExperiment(ColorMatchingInstance):
