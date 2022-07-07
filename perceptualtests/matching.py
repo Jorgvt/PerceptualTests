@@ -106,8 +106,8 @@ class ColorMatchingInstance():
                  background_radiance,
                  img_size,
                  space_transform_fn,
-                 norm_grads):
-        super(ColorMatchingInstance, self).__init__()
+                 initial_weights=[0.001, 0.001, 0.001, 0.001],
+                 norm_grads=False):
         self.wavelength = wavelength
         self.central_wavelengths = central_wavelengths
         self.lambdas = lambdas
@@ -116,7 +116,7 @@ class ColorMatchingInstance():
         self.img_size = img_size
         self.space_transform_fn = space_transform_fn
         self.norm_grads = norm_grads
-        self.weights = tf.Variable([0.001, 0.001, 0.001, 0.001],
+        self.weights = tf.Variable(initial_weights,
                                    trainable=True,
                                    dtype=tf.float32)
         self._Ts = None
