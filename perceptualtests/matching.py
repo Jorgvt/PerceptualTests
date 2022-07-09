@@ -204,3 +204,59 @@ class ColorMatchingExperiment(ColorMatchingInstance):
                                    use_tqdm=use_tqdm)
             histories.append(history)
         return histories
+
+class LuminanceMatchingInstance(ColorMatchingInstance):
+    """
+    A luminance matching experiment instance, where instance means
+    only a single wavelength. A full luminance matching experiment
+    is compromised of a full run over a collection of wavelengths.
+    """
+
+    def __init__(self, 
+                 initial_weights, 
+                 wavelength_ref,
+                 **kwargs):
+        super(LuminanceMatchingInstance, self).__init__(**kwargs)
+        self.weights = tf.Variable(initial_weights,
+                                   trainable=True,
+                                   dtype=tf.float32,
+                                   constraint=tf.keras.constraints.NonNeg())
+        self.wavelength_ref = wavelength_ref
+
+    def generate_images(self):
+        spectrum_lambda = monochomatic_stimulus_2_tf(self.wavelength, self.lambdas, width=10, max_radiance=tf.abs(self.weights)*self.max_radiance, background=self.background_radiance)
+        spectrum_white = monochomatic_stimulus_2_tf(self.wavelength_ref, self.lambdas, width=10, max_radiance=self.max_radiance, background=self.background_radiance)
+
+        t1_l = km*tf.reduce_sum(self.Ts[0]*spectrum_lambda)
+        t2_l = km*tf.reduce_sum(self.Ts[1]*spectrum_lambda)
+        t3_l = km*tf.reduce_sum(self.Ts[2]*spectrum_lambda)
+        t1_w = km*tf.reduce_sum(self.Ts[0]*spectrum_white)
+        t2_w = km*tf.reduce_sum(self.Ts[1]*spectrum_white)
+        t3_w = km*tf.reduce_sum(self.Ts[2]*spectrum_white)
+
+        t_l = tf.convert_to_tensor([t1_l, t2_l, t3_l], dtype = tf.float32)[:,None]
+        t_w = tf.convert_to_tensor([t1_w, t2_w, t3_w], dtype = tf.float32)[:,None]
+
+        rgb_lambda = self.space_transform_fn(t_l)
+        rgb_white = self.space_transform_fn(t_w)
+
+        img_lambda = tf.ones((1,*self.img_size,3), dtype=tf.float32)*tf.cast(tf.transpose(rgb_lambda, perm=[1,0]), tf.float32)
+        img_white = tf.ones((1,*self.img_size,3), dtype=tf.float32)*tf.cast(tf.transpose(rgb_white, perm=[1,0]), tf.float32)
+
+        return img_lambda, img_white#, rgb_2_l, rgb_2_w
+
+class LuminanceMatchingExperiment(ColorMatchingExperiment):
+    """
+    Luminance matching experiment where different monochromatic lights
+    are given and the user has to minimize the distance with respect
+    to a white image.
+    This process is performed in an iterative way by optimizing the
+    ammount 'brightness' (luminance) into the images.
+    """
+    def __init__(self,
+                 wavelengths=np.linspace(380, 770, 50),
+                 wavelength_ref=550.0,
+                 **kwargs):
+        self.wavelengths = wavelengths
+        self.wavelength_ref=wavelength_ref
+        self.instances = [LuminanceMatchingInstance(wavelength=wavelength, wavelength_ref=wavelength_ref, **kwargs) for wavelength in wavelengths]
