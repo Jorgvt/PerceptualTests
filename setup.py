@@ -9,5 +9,7 @@ setup(
     author_email='jorge.vila-tomas@uv.es',
     license='BSD 2-clause',
     packages=['perceptualtests'],
-    install_requires=[]
+    install_requires=[],
+    include_package_data=True,
+    package_data={'': ['data/*.mat']}
 )
