@@ -337,6 +337,38 @@ class MaskingContrastFrequencyTest(Masking):
         plt.ylabel('Visibility')
         plt.legend(title = 'Test frequency')
 
+class ContrastSensitivityFunctionTest(MaskingContrastFrequencyTest):
+    """
+    Test to obtain the Contrast Sensitivity Function of a model.
+    It is calculated by passing images with no stimuli (only background)
+    and images with low contrast and calculating their differences.
+    This would be equivalent to calculating the threshold at which the model
+    stops seeing the stimuli.
+    """
+    def __init__(self, **kwargs):
+        super(ContrastSensitivityFunctionTest, self).__init__(**kwargs)
+        self._background = None
+
+    @property
+    def background(self):
+        if self._background is None:
+            bg_atd, bg_rgb = self.stimuli_fn(f_tests=np.array([0]),
+                                             c_noises=self.c_tests)
+            self._background = bg_rgb[None,:]
+        return self._background
+
+    def get_readouts(self, model):
+        outputs = model.predict(self.stimuli)
+        readouts = (outputs-outputs[0])**2
+        readouts = np.sqrt(np.sum(readouts, axis=(1,2,3)))
+        return readouts
+
+    def plot_result(self, readouts):
+        plt.plot(self.f_tests, readouts)
+        plt.xlabel('Test Frequency')
+        plt.ylabel('Visibility')
+        plt.xscale('log')
+
 class MaskingFixedFrequencyTest(Masking):
     """
     Test to check the behaviour when changing the contrast
