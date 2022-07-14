@@ -4,7 +4,7 @@ This repository contains different tests to assess the perceptual behaviour of v
 # Installation
 Right now, the package is not available on conda but can cloned and installed with ease or be installed from pip:
 
-## `pip``
+## `pip`
 
 This should be the last stable version. Might be missing some features that we are developing in the repo, but should work nonetheless.
 
