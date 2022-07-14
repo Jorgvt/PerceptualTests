@@ -349,6 +349,7 @@ class ContrastSensitivityFunctionTest(MaskingContrastFrequencyTest):
     def __init__(self, **kwargs):
         super(ContrastSensitivityFunctionTest, self).__init__(**kwargs)
         self._background = None
+        self.c_tests = [self.c_tests] if isinstance(self.c_tests, (int, float)) else [self.c_tests[0]]
 
     @property
     def background(self):
