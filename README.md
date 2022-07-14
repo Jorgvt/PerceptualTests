@@ -4,7 +4,7 @@ This repository contains different tests to assess the perceptual behaviour of v
 # Installation
 Right now, the package is not available on conda but can cloned and installed with ease or be installed from pip:
 
-## `pip`
+## From `pip`
 
 This should be the last stable version. Might be missing some features that we are developing in the repo, but should work nonetheless.
 
@@ -12,7 +12,7 @@ This should be the last stable version. Might be missing some features that we a
 pip install perceptualtests
 ```
 
-## GitHub
+## From GitHub
 
 This will install the **development** version, which probably has more features than the one on `pip` but is more prone to bugs and unexepected behaviours.
 
