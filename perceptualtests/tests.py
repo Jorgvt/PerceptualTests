@@ -12,6 +12,7 @@ __all__ = ['PsychoTest',
            'CrispeningRedGreenTest', 
            'CrispeningYellowBlueTest',
            'MaskingContrastFrequencyTest',
+           'ContrastSensitivityFunctionTest'
            'MaskingFixedFrequencyTest',
            'MaskingFrequencyBackgroundTest',
            'MaskingOrientationBackgroundTest']
@@ -368,6 +369,14 @@ class ContrastSensitivityFunctionTest(MaskingContrastFrequencyTest):
         plt.xlabel('Test Frequency')
         plt.ylabel('Visibility')
         plt.xscale('log')
+
+    def show_stimuli(self, **kwargs):
+        fig, axes = plt.subplots(nrows=len(self.c_tests),
+                                 ncols=len(self.f_tests),
+                                 **kwargs)
+        for ax, img in zip(axes, self.stimuli):
+            ax.imshow(img)
+            ax.axis('off')
 
 class MaskingFixedFrequencyTest(Masking):
     """
