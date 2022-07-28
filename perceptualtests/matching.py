@@ -1,4 +1,6 @@
 from abc import abstractmethod
+from matplotlib.pyplot import hist
+from pandas import lreshape
 from tqdm.auto import tqdm
 
 import numpy as np
@@ -81,6 +83,8 @@ class ColorMatchingInstance():
                  background_radiance,
                  img_size,
                  space_transform_fn,
+                 width_lambda=10,
+                 width_central_lambdas=5,
                  initial_weights=[0.001, 0.001, 0.001, 0.001],
                  norm_grads=False):
         self.wavelength = wavelength
@@ -88,6 +92,8 @@ class ColorMatchingInstance():
         self.lambdas = lambdas
         self.max_radiance = max_radiance
         self.background_radiance = background_radiance
+        self.width_lambda = width_lambda
+        self.width_central_lambdas = width_central_lambdas
         self.img_size = img_size
         self.space_transform_fn = space_transform_fn
         self.norm_grads = norm_grads
@@ -110,14 +116,14 @@ class ColorMatchingInstance():
         self.optimizer = optimizer
 
     def generate_images(self):
-        spectrum_lambda = monochomatic_stimulus_2_tf(self.wavelength, self.lambdas, width=10, max_radiance=0.75*2*self.max_radiance, background=5*self.background_radiance)
+        spectrum_lambda = monochomatic_stimulus_2_tf(self.wavelength, self.lambdas, width=self.width_lambda, max_radiance=0.75*2*self.max_radiance, background=5*self.background_radiance)
         Y_l = km*tf.reduce_sum(self.Ts[1]*spectrum_lambda)
         spectrum_white = tf.cast(tf.ones_like(self.lambdas, dtype=tf.float32)*self.background_radiance*10, tf.float32)
         Y_w = km*tf.reduce_sum(self.Ts[1]*spectrum_white)
         spectrum_white = spectrum_white*Y_l/Y_w
 
         for i in range(len(self.central_wavelengths)):
-            spectrum = monochomatic_stimulus_2_tf(self.central_wavelengths[i], self.lambdas, width=5, max_radiance=0.75*self.max_radiance*tf.abs(self.weights[i]), background=self.background_radiance)
+            spectrum = monochomatic_stimulus_2_tf(self.central_wavelengths[i], self.lambdas, width=self.width_central_lambdas, max_radiance=0.75*self.max_radiance*tf.abs(self.weights[i]), background=self.background_radiance)
             if self.weights[i] >= 0:
                 spectrum_lambda = spectrum_lambda + spectrum
             else:
@@ -147,7 +153,7 @@ class ColorMatchingInstance():
             print('The experiment has not been fitted yet.')
         return self._history
 
-    def fit(self, model, epochs, verbose=True, use_tqdm=True):
+    def fit(self, model, epochs, verbose=True, use_tqdm=True, lr_callback=None, early_stopping=None):
         if self._history is None:
             self._history = {'Loss':[], 'GradsL2':[], 'Weights':[]}
         pbar = tqdm(range(epochs)) if use_tqdm else range(epochs)
@@ -164,10 +170,96 @@ class ColorMatchingInstance():
             self.history['Loss'].append(loss.numpy().item())
             self.history['GradsL2'].append(tf.reduce_sum(grads**2).numpy().item())
             self.history['Weights'].append(self.weights.numpy())
+
+            if lr_callback is not None and epoch >= 1:
+                lr_callback.check_improvement(self.history)
+                lr_callback.reduce_lr()
+
+            if early_stopping is not None and epoch >= 1:
+                early_stopping.check_improvement(self.history)
+                if early_stopping.stop_training():
+                    break
+
             if verbose and not use_tqdm:
                 if epoch % verbose == 0:
                     print(f'Epoch {epoch+1} -> Loss: {self.history["Loss"][-1]} | GradsL2: {self.history["GradsL2"][-1]}')
         return self.history
+
+class ReduceLROnPlateau():
+    def __init__(self,
+                 factor,
+                 patience,
+                 cooldown,
+                 min_lr,
+                 delta,
+                 optimizer,
+                 verbose=False):
+        self.factor = factor
+        self.patience = patience
+        self.cooldown = cooldown
+        self.min_lr = min_lr
+        self.delta = delta
+        self.optimizer = optimizer
+        self.verbose = verbose
+        self.steps_no_improve = 0
+        self.steps_cooldown = cooldown
+        self.min_loss = 99999999
+
+    def check_improvement(self, history):
+        # if np.abs((history['Loss'][-1]-self.min_loss)/self.min_loss) <= self.delta:
+        if history['Loss'][-1] >= self.min_loss:
+            self.steps_no_improve += 1
+        else:
+            self.min_loss = history['Loss'][-1]
+            self.steps_no_improve = 0
+    
+    def reduce_lr(self):
+        lr = float(tf.keras.backend.get_value(self.optimizer.learning_rate))
+        if lr > self.min_lr:
+            if self.steps_no_improve == self.patience:
+                if self.steps_cooldown < self.cooldown:
+                    self.steps_cooldown += 1
+                else:    
+                    new_lr = lr*self.factor
+                    tf.keras.backend.set_value(self.optimizer.lr, new_lr)
+                    self.steps_cooldown = 0
+                    if self.verbose:
+                        print(f'Learning Rate changed: {lr} -> {new_lr}')
+    def reset(self):
+        self.steps_no_improve = 0
+        self.steps_cooldown = self.cooldown
+        self.min_loss = 99999999
+
+class EarlyStopping():
+    def __init__(self,
+                 patience,
+                 delta,
+                 verbose=False):
+        self.patience = patience
+        self.delta = delta
+        self.verbose = verbose
+        self.steps_no_improve = 0
+        self.min_loss = 99999999
+
+    def check_improvement(self, history):
+        # if np.abs((history['Loss'][-1]-self.min_loss)/self.min_loss) <= self.delta:
+        if history['Loss'][-1] >= self.min_loss:
+            self.steps_no_improve += 1
+        else:
+            self.min_loss = history['Loss'][-1]
+            self.steps_no_improve = 0
+    
+    def stop_training(self):
+        if self.steps_no_improve == self.patience:
+            if self.verbose:
+                print('Stopping training.')
+            return True
+        else:
+            return False
+
+    def reset(self):
+        self.steps_no_improve = 0
+        self.min_loss = 99999999
 
 class ColorMatchingExperiment(ColorMatchingInstance):
     """
@@ -192,16 +284,28 @@ class ColorMatchingExperiment(ColorMatchingInstance):
             instance.loss = loss
             instance.optimizer = optimizer
 
-    def fit(self, model, epochs, verbose=True, use_tqdm=True):
+    def fit(self, model, epochs, verbose=True, use_tqdm=True, lr_cb_fn=None, es_cb_fn=None):
         histories = []
         pbar = tqdm(self.instances) if use_tqdm else self.instances
         for instance in pbar:
             if verbose and not use_tqdm:
                 print(f'Wavelength: {instance.wavelength}')
+            if lr_cb_fn is not None:
+                lr_callback = lr_cb_fn()
+            else:
+                lr_callback = None
+
+            if es_cb_fn is not None:
+                early_stopping = es_cb_fn()
+            else:
+                early_stopping = None
+
             history = instance.fit(model,
                                    epochs=epochs,
                                    verbose=verbose,
-                                   use_tqdm=use_tqdm)
+                                   use_tqdm=use_tqdm,
+                                   lr_callback=lr_callback,
+                                   early_stopping=early_stopping)
             histories.append(history)
         return histories
 
